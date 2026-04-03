@@ -1,0 +1,9 @@
+User-Agent: *
+Allow: /
+Disallow: /private/
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+
+User-Agent: Google-Extended
+Allow: /
+
+Sitemap: https://blog.nicolas-calvache.com/sitemap.xml
