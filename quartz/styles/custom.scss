@@ -1,3 +1,362 @@
 @use "./base.scss";
 
-// put your custom CSS here!
+// ─── Forest Digital Garden — Custom Theme ────────────────────────────────────
+// All colors use Quartz CSS variables — no hardcoded hex values.
+// To change the palette, edit quartz.config.ts → theme.colors.
+//
+// Variable reference (set by quartz/util/theme.ts):
+//   --light       → page background
+//   --lightgray   → sidebar / surface container
+//   --gray        → borders, muted text
+//   --darkgray    → body text
+//   --dark        → headings / primary text
+//   --secondary   → primary accent (lime green)
+//   --tertiary    → secondary accent (soft green)
+//   --highlight   → hover / selection tint
+//   --textHighlight → text mark background
+
+// ── Derived tokens (computed from Quartz vars, no hard values) ────────────────
+:root {
+  // Slightly darker than --light for inset surfaces
+  --surface-dim: color-mix(in srgb, var(--light) 70%, black);
+  // Slightly lighter than --lightgray for elevated surfaces
+  --surface-raised: color-mix(in srgb, var(--lightgray) 80%, white 20%);
+
+  // Accent with opacity — used for borders, glows, hover states
+  --accent-faint: color-mix(in srgb, var(--secondary) 8%, transparent);
+  --accent-subtle: color-mix(in srgb, var(--secondary) 15%, transparent);
+  --accent-glow: color-mix(in srgb, var(--secondary) 25%, transparent);
+  --accent-border: color-mix(in srgb, var(--secondary) 40%, transparent);
+
+  // Border using --gray
+  --border-dim: color-mix(in srgb, var(--gray) 35%, transparent);
+  --border-mid: color-mix(in srgb, var(--gray) 50%, transparent);
+}
+
+// ── Layout spacing — more breathing room ─────────────────────────────────────
+// DOM structure (from renderPage.tsx):
+//   div.center
+//     div.page-header  ← LanguageSwitcher + beforeBody (Breadcrumbs, h1, meta)
+//     Content          ← article body / folder listing
+//     hr
+//     div.page-footer
+//
+// Both .page-header and Content are DIRECT children of .center.
+// Padding on .center applies uniformly to both → everything aligns.
+.page>#quartz-body>.center {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+
+  @media (max-width: 800px) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+// Right sidebar breathing room
+.page>#quartz-body>.sidebar.right {
+  padding-left: 1rem;
+  padding-right: 0.5rem;
+  box-sizing: border-box;
+}
+
+// ── Base body ─────────────────────────────────────────────────────────────────
+body {
+  background-color: var(--light);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--accent-faint) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 60%, color-mix(in srgb, var(--secondary) 5%, transparent) 0%, transparent 60%);
+  min-height: 100vh;
+  font-family: var(--bodyFont);
+  -webkit-font-smoothing: antialiased;
+}
+
+// ── Typography ────────────────────────────────────────────────────────────────
+// Use Quartz's own font variables (set via quartz.config.ts → theme.typography)
+// so changing fonts there propagates everywhere automatically.
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--headerFont);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-weight: 800;
+}
+
+// Footer uses body font explicitly (overrides any inherited styles)
+footer {
+  font-family: var(--bodyFont);
+}
+
+
+// Article prose links
+article a {
+  color: var(--secondary);
+  text-decoration-color: color-mix(in srgb, var(--secondary) 40%, transparent);
+  text-underline-offset: 3px;
+  transition: color 0.2s, text-decoration-color 0.2s;
+
+  &:hover {
+    color: var(--tertiary);
+    text-decoration-color: var(--tertiary);
+  }
+}
+
+// ── Header — glassmorphism / forest canopy backdrop ───────────────────────────
+#quartz-body>header,
+header.quartz-breadcrumb,
+.navbar {
+  background: color-mix(in srgb, var(--light) 70%, transparent) !important;
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border-bottom: 1px solid var(--accent-faint);
+}
+
+// Site title accent
+.page-title a {
+  color: var(--secondary) !important;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+// ── Sidebar / Explorer ────────────────────────────────────────────────────────
+#quartz-body>.sidebar,
+.sidebar {
+  background: var(--lightgray);
+  border-right: 1px solid var(--border-dim);
+}
+
+// Explorer folder / file items
+.explorer-content {
+
+  li,
+  a,
+  button {
+    transition: color 0.15s, background-color 0.15s;
+    border-radius: 6px;
+  }
+
+  a:hover,
+  button:hover {
+    background-color: var(--accent-faint);
+    color: var(--secondary);
+  }
+}
+
+// Folder toggle arrows — tint them green
+.folder-icon svg,
+.fold svg {
+  stroke: var(--secondary);
+  opacity: 0.7;
+}
+
+// ── Content cards (folder listing pages) ──────────────────────────────────────
+// Quartz generates .section-li cards on tag/folder pages
+.section-li {
+  background: var(--lightgray);
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  transition: background-color 0.25s, transform 0.25s, border-color 0.25s;
+
+  &:hover {
+    background: var(--surface-raised);
+    border-color: var(--accent-border);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px color-mix(in srgb, black 35%, transparent), 0 0 0 1px var(--accent-faint);
+  }
+
+  // Article title inside a card
+  h3 a {
+    color: var(--secondary) !important;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-weight: 700;
+  }
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
+.tags {
+  a.tag-link {
+    background: var(--lightgray);
+    color: var(--darkgray);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: lowercase;
+    border: 1px solid var(--border-dim);
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--accent-subtle);
+      color: var(--secondary);
+      border-color: var(--accent-border);
+    }
+  }
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+#search-bar {
+  background: var(--surface-dim) !important;
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  color: var(--dark);
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus-within {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--highlight);
+  }
+}
+
+// ── Table of Contents ─────────────────────────────────────────────────────────
+#toc {
+  border-left: 2px solid color-mix(in srgb, var(--secondary) 25%, transparent);
+  padding-left: 1rem;
+
+  a {
+    color: var(--gray);
+    transition: color 0.15s, padding-left 0.15s;
+
+    &:hover,
+    &.in-view {
+      color: var(--secondary);
+      padding-left: 4px;
+    }
+  }
+}
+
+// ── Blockquotes ───────────────────────────────────────────────────────────────
+blockquote {
+  border-left: 3px solid var(--tertiary);
+  background: color-mix(in srgb, var(--secondary) 5%, transparent);
+  border-radius: 0 8px 8px 0;
+  padding: 0.75rem 1.25rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  color: var(--darkgray);
+}
+
+// ── Callouts (Obsidian-style) ─────────────────────────────────────────────────
+.callout {
+  border-radius: 10px;
+  border-left-width: 3px;
+}
+
+// ── Code blocks ───────────────────────────────────────────────────────────────
+pre {
+  background: var(--surface-dim) !important;
+  border: 1px solid var(--border-mid);
+  border-radius: 10px;
+}
+
+code:not(pre code) {
+  background: color-mix(in srgb, var(--secondary) 12%, transparent);
+  color: var(--secondary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.875em;
+}
+
+// ── Page footer ───────────────────────────────────────────────────────────────
+footer {
+  border-top: 1px solid var(--border-dim);
+  color: var(--gray);
+  font-size: 0.75rem;
+  font-family: "Manrope", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+
+  a:hover {
+    color: var(--secondary);
+    opacity: 1;
+  }
+}
+
+// ── Graph view ────────────────────────────────────────────────────────────────
+#graph-container {
+  .graph-node circle {
+    fill: var(--lightgray);
+    stroke: var(--secondary);
+  }
+
+  .graph-node text {
+    fill: var(--dark);
+  }
+
+  .graph-link {
+    stroke: var(--tertiary);
+    opacity: 0.4;
+  }
+}
+
+// ── Scrollbar ─────────────────────────────────────────────────────────────────
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 3px;
+
+  &:hover {
+    background: var(--accent-glow);
+  }
+}
+
+// ── Selection highlight ───────────────────────────────────────────────────────
+::selection {
+  background: var(--accent-glow);
+  color: var(--dark);
+}
+
+// ── Back-to-top button ────────────────────────────────────────────────────────
+#back-to-top {
+  background: var(--lightgray);
+  border: 1px solid color-mix(in srgb, var(--secondary) 25%, transparent);
+  border-radius: 50%;
+  color: var(--secondary);
+  transition: background 0.2s, transform 0.2s;
+
+  &:hover {
+    background: var(--accent-subtle);
+    transform: translateY(-2px);
+  }
+}
+
+// ── Ambient leaf glow — purely decorative ─────────────────────────────────────
+#quartz-body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120vw;
+  height: 60vh;
+  background: radial-gradient(ellipse at top, color-mix(in srgb, var(--secondary) 5.5%, transparent) 0%, transparent 65%);
+  z-index: 0;
+}
