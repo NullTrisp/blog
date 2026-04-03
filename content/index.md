@@ -1,6 +1,6 @@
 ---
-title: Welcome to Quartz
+title: Redirect
 ---
-
-This is a blank Quartz installation.
-See the [documentation](https://quartz.jzhao.xyz) for how to get started.
+<script>
+  window.location.pathname = '/en/'
+</script>
