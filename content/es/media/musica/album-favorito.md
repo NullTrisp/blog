@@ -1,0 +1,18 @@
+---
+title: "Álbum Favorito: OK Computer de Radiohead"
+date: 2026-06-21
+tags: [música, reseña-álbum, radiohead]
+category: [media, música]
+---
+
+**Artista:** Radiohead
+**Álbum:** OK Computer
+**Año:** 1997
+
+**Por qué me encanta:**
+Una obra maestra del rock alternativo, "OK Computer" captura perfectamente las ansiedades de la vida moderna y la tecnología a finales del milenio. Sus melodías inquietantes, arreglos intrincados y letras profundas lo convierten en un clásico atemporal.
+
+**Temas destacados:**
+*   "Paranoid Android"
+*   "Karma Police"
+*   "No Surprises"
