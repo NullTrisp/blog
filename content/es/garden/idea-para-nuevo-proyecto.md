@@ -1,5 +1,6 @@
 ---
 title: "Idea para un nuevo proyecto: Asistente Financiero con IA"
+translation_id: "idea-proyecto"
 date: 2026-06-21
 tags: [ideas, proyectos, ia, finanzas]
 category: [jardin-digital, tecnología]

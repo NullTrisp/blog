@@ -1,12 +1,41 @@
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "./types"
 import { classNames } from "../util/lang"
 
-const LanguageSwitcher: QuartzComponent = ({ displayClass }: QuartzComponentProps) => {
+const LanguageSwitcher: QuartzComponent = ({ fileData, allFiles, displayClass }: QuartzComponentProps) => {
+  const currentSlug = fileData.slug
+  if (!currentSlug) return null
+
+  // Determine current language
+  let currentLang = "en"
+  if (currentSlug.startsWith("es/")) currentLang = "es"
+  else if (currentSlug.startsWith("en/")) currentLang = "en"
+  else return null // Hide if not in a language subfolder
+
+  const targetLang = currentLang === "es" ? "en" : "es"
+  const transId = fileData.frontmatter?.translation_id
+
+  // Default target is the root of the other language
+  let targetSlug = `/${targetLang}/`
+
+  // If we have a translation ID, search all files for the matching one in the target language
+  if (transId) {
+    const match = allFiles.find(
+      (f) =>
+        f.frontmatter?.translation_id === transId &&
+        f.slug?.startsWith(`${targetLang}/`)
+    )
+    if (match && match.slug) {
+      targetSlug = `/${match.slug}`
+    }
+  }
+
+  const label = targetLang === "es" ? "ES" : "EN"
+
   return (
     <div class={classNames(displayClass, "language-switcher")}>
-      <a href="/en/" class="lang-link" data-lang="en">EN</a>
+      <span class="lang-label">{currentLang.toUpperCase()}</span>
       <span>|</span>
-      <a href="/es/" class="lang-link" data-lang="es">ES</a>
+      <a href={targetSlug} class="lang-link">{label}</a>
     </div>
   )
 }
@@ -21,7 +50,7 @@ LanguageSwitcher.css = `
   font-size: 0.9rem;
 }
 
-.language-switcher a {
+.language-switcher a, .language-switcher .lang-label {
   text-decoration: none;
   color: var(--gray);
   transition: color 0.2s ease;
@@ -31,32 +60,10 @@ LanguageSwitcher.css = `
   color: var(--secondary);
 }
 
-.language-switcher a.active {
+.language-switcher .lang-label {
   color: var(--secondary);
   pointer-events: none;
 }
 `
-
-const script = `
-document.addEventListener("nav", () => {
-  const path = window.location.pathname
-  const lang = path.split("/")[1]
-  const links = document.querySelectorAll(".language-switcher a")
-  links.forEach(link => {
-    const dataLang = link.getAttribute("data-lang")
-    if (dataLang === lang) {
-      link.classList.add("active")
-    } else {
-      link.classList.remove("active")
-      // Update link to point to the same page in another language if possible
-      // This is a simple implementation that just changes the prefix
-      const restOfPath = path.split("/").slice(2).join("/")
-      link.href = "/" + dataLang + "/" + restOfPath
-    }
-  })
-})
-`
-
-LanguageSwitcher.afterDOMLoaded = script
 
 export default (() => LanguageSwitcher) satisfies QuartzComponentConstructor

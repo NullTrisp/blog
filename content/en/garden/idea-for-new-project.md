@@ -1,5 +1,6 @@
 ---
 title: "Idea for a new project: AI-powered Financial Assistant"
+translation_id: "idea-proyecto"
 date: 2026-06-21
 tags: [ideas, projects, ai, finance]
 category: [digital-garden, technology]
