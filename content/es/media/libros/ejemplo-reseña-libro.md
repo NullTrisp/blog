@@ -1,8 +1,15 @@
 ---
 title: "Reseña de Libro: 'Guía del Autoestopista Galáctico'"
 date: 2026-06-21
-tags: [libros, ciencia-ficción, humor, reseña]
-category: [media, literatura]
+tags:
+  - libros
+  - ciencia-ficción
+  - humor
+  - reseña
+category:
+  - media
+  - literatura
+translation_id: book-example
 ---
 
 **Autor:** Douglas Adams

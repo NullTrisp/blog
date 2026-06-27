@@ -1,8 +1,15 @@
 ---
 title: "Book Review: 'The Hitchhiker's Guide to the Galaxy'"
 date: 2026-06-21
-tags: [books, sci-fi, humor, review]
-category: [media, literature]
+tags:
+  - books
+  - sci-fi
+  - humor
+  - review
+category:
+  - media
+  - literature
+translation_id: book-example
 ---
 
 **Author:** Douglas Adams
