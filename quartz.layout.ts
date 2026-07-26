@@ -1,6 +1,9 @@
 import { PageLayout, SharedLayout } from "./quartz/cfg"
 import * as Component from "./quartz/components"
 import { withPageLocale } from "./custom/localization"
+import { LocalizedTagList } from "./custom/tagLocalization"
+import LocalizedGraph from "./custom/localizedGraph"
+import LocalizedBreadcrumbs from "./custom/localizedBreadcrumbs"
 
 // components shared across all pages
 export const sharedPageComponents: SharedLayout = {
@@ -18,12 +21,12 @@ export const sharedPageComponents: SharedLayout = {
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
     Component.ConditionalRender({
-      component: Component.Breadcrumbs(),
+      component: LocalizedBreadcrumbs(),
       condition: (page) => page.fileData.slug !== "index",
     }),
     Component.ArticleTitle(),
     withPageLocale(Component.ContentMeta()),
-    Component.TagList(),
+    LocalizedTagList,
   ],
   left: [
     withPageLocale(Component.PageTitle()),
@@ -53,7 +56,7 @@ export const defaultContentPageLayout: PageLayout = {
     ),
   ],
   right: [
-    withPageLocale(Component.Graph()),
+    withPageLocale(LocalizedGraph()),
     Component.DesktopOnly(withPageLocale(Component.TableOfContents())),
     withPageLocale(Component.Backlinks()),
   ],
@@ -62,7 +65,7 @@ export const defaultContentPageLayout: PageLayout = {
 // components for pages that display lists of pages  (e.g. tags or folders)
 export const defaultListPageLayout: PageLayout = {
   beforeBody: [
-    Component.Breadcrumbs(),
+    LocalizedBreadcrumbs(),
     Component.ArticleTitle(),
     withPageLocale(Component.ContentMeta()),
   ],

@@ -1,6 +1,6 @@
 ---
 
-title: "Turn an Android Phone into a Remote Ubuntu Server (No root required)"
+title: "Convierte un teléfono Android en un servidor Ubuntu remoto (no se requiere acceso root)."
 date: 2026-07-25
 tags: [android, termux, ubuntu, ssh, vscode, cloudflare]
 category: [technology]

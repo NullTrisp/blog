@@ -1,6 +1,8 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
 import { PageLanguage } from "./custom/localization"
+import { LocalizedFolderContent } from "./custom/tagLocalization"
+import { LocalizedTagPage } from "./custom/localizedTagPage"
 
 /**
  * Quartz 4 Configuration
@@ -80,8 +82,8 @@ const config: QuartzConfig = {
       Plugin.AliasRedirects(),
       Plugin.ComponentResources(),
       Plugin.ContentPage(),
-      Plugin.FolderPage(),
-      Plugin.TagPage(),
+      Plugin.FolderPage({ pageBody: LocalizedFolderContent() }),
+      LocalizedTagPage(),
       Plugin.ContentIndex({
         enableSiteMap: true,
         enableRSS: true,
