@@ -1,33 +1,71 @@
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "./types"
 import { classNames } from "../util/lang"
+import { FullSlug, simplifySlug } from "../util/path"
 
-const LanguageSwitcher: QuartzComponent = ({ fileData, allFiles, displayClass }: QuartzComponentProps) => {
+type SupportedLanguage = "en" | "es"
+
+type LocalizedFile = {
+  slug?: string
+  frontmatter?: Record<string, unknown>
+}
+
+type LanguageSwitchTarget = {
+  currentLang: SupportedLanguage
+  targetLang: SupportedLanguage
+  targetSlug: string
+}
+
+export function getLanguageSwitchTarget(
+  currentSlug: string,
+  allFiles: LocalizedFile[],
+  transId?: unknown,
+): LanguageSwitchTarget | undefined {
+  const currentLang = currentSlug.startsWith("es/")
+    ? "es"
+    : currentSlug.startsWith("en/")
+      ? "en"
+      : undefined
+
+  if (!currentLang) return undefined
+
+  const targetLang = currentLang === "es" ? "en" : "es"
+  let match: LocalizedFile | undefined
+
+  if (transId) {
+    match = allFiles.find(
+      (file) =>
+        file.frontmatter?.translation_id === transId && file.slug?.startsWith(`${targetLang}/`),
+    )
+  }
+
+  // Folder indexes and pages with the same slug often do not need a translation ID.
+  // Preserve the path when its equivalent exists in the other language.
+  if (!match) {
+    const equivalentSlug = `${targetLang}/${currentSlug.split("/").slice(1).join("/")}`
+    match = allFiles.find((file) => file.slug === equivalentSlug)
+  }
+
+  const targetSlug = match?.slug ? `/${simplifySlug(match.slug as FullSlug)}` : `/${targetLang}/`
+
+  return { currentLang, targetLang, targetSlug }
+}
+
+const LanguageSwitcher: QuartzComponent = ({
+  fileData,
+  allFiles,
+  displayClass,
+}: QuartzComponentProps) => {
   const currentSlug = fileData.slug
   if (!currentSlug) return null
 
-  // Determine current language
-  let currentLang = "en"
-  if (currentSlug.startsWith("es/")) currentLang = "es"
-  else if (currentSlug.startsWith("en/")) currentLang = "en"
-  else return null // Hide if not in a language subfolder
+  const target = getLanguageSwitchTarget(
+    currentSlug,
+    allFiles,
+    fileData.frontmatter?.translation_id,
+  )
+  if (!target) return null
 
-  const targetLang = currentLang === "es" ? "en" : "es"
-  const transId = fileData.frontmatter?.translation_id
-
-  // Default target is the root of the other language
-  let targetSlug = `/${targetLang}/`
-
-  // If we have a translation ID, search all files for the matching one in the target language
-  if (transId) {
-    const match = allFiles.find(
-      (f) =>
-        f.frontmatter?.translation_id === transId &&
-        f.slug?.startsWith(`${targetLang}/`)
-    )
-    if (match && match.slug) {
-      targetSlug = `/${match.slug}`
-    }
-  }
+  const { currentLang, targetLang, targetSlug } = target
 
   const label = targetLang === "es" ? "ES" : "EN"
 
@@ -35,7 +73,9 @@ const LanguageSwitcher: QuartzComponent = ({ fileData, allFiles, displayClass }:
     <div class={classNames(displayClass, "language-switcher")}>
       <span class="lang-label">{currentLang.toUpperCase()}</span>
       <span>|</span>
-      <a href={targetSlug} class="lang-link">{label}</a>
+      <a href={targetSlug} class="lang-link">
+        {label}
+      </a>
     </div>
   )
 }
