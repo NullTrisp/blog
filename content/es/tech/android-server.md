@@ -1,288 +1,276 @@
 ---
-
-title: "Convierte un teléfono Android en un servidor Ubuntu remoto (no se requiere acceso root)."
+title: "Convierte un teléfono Android en un servidor Ubuntu remoto (sin acceso root en Android)"
 date: 2026-07-25
 tags: [android, termux, ubuntu, ssh, vscode, cloudflare]
-category: [technology]
+category: [tecnología]
 translation_id: android-server
-
 ---
 
-This guide explains how to run Ubuntu 26.04 on an Android phone using Termux and PRoot, enable secure SSH access, and make the server remotely accessible through a Cloudflare Tunnel protected by Cloudflare Access.
+Esta guía explica cómo ejecutar Ubuntu 26.04 en un teléfono Android mediante Termux y PRoot, habilitar un acceso SSH seguro y permitir el acceso remoto al servidor a través de un túnel de Cloudflare protegido por Cloudflare Access.
 
-It was tested on a Samsung Galaxy S8 and Samsung Galaxy S20.
+Esta configuración se probó en un Samsung Galaxy S8 y un Samsung Galaxy S20.
 
-The final connection works like this:
-
-```text
-SSH or VS Code
-      │
-      ▼
-cloudflared on the client
-      │
-      ▼
-Cloudflare Access authentication
-      │
-      ▼
-Cloudflare Tunnel
-      │
-      ▼
-cloudflared inside Ubuntu
-      │
-      ▼
-SSH server on 127.0.0.1:2022
-```
-
-No inbound port needs to be opened on the phone or router. Cloudflare Tunnel establishes an outbound connection from the phone to Cloudflare.
-
-> [!WARNING] Availability
-> This is useful for personal development, experiments, and occasional remote access. It is not equivalent to a conventional production server. Android may terminate Termux because of battery management, memory pressure, system updates, or a reboot.
-
-## Requirements
-
-Before beginning, make sure you have:
-
-* An Android phone.
-* A Cloudflare account.
-* A domain whose DNS is managed through Cloudflare.
-* A computer from which you will connect.
-* OpenSSH installed on the client computer.
-* An email address that will be allowed by the Cloudflare Access policy.
-* Physical access to the phone during the initial setup.
-* [Termux Version 0.118.3](https://f-droid.org/repo/com.termux_1002.apk)
-
-Throughout this guide, replace:
+La conexión final funciona de la siguiente manera:
 
 ```text
-ssh.example.com
+SSH o VS Code
+      │
+      ▼
+cloudflared en el cliente
+      │
+      ▼
+Autenticación de Cloudflare Access
+      │
+      ▼
+Túnel de Cloudflare
+      │
+      ▼
+cloudflared dentro de Ubuntu
+      │
+      ▼
+Servidor SSH en 127.0.0.1:2022
 ```
 
-with the hostname you want to use.
+No necesitas abrir ningún puerto de entrada ni en el teléfono ni en el router. El túnel de Cloudflare establece una conexión saliente desde el teléfono hacia Cloudflare.
 
-Replace:
+> [!WARNING] Disponibilidad
+> Esta configuración resulta útil para desarrollo personal, experimentos y acceso remoto ocasional. No equivale a un servidor de producción convencional. Android puede finalizar Termux debido a sus políticas de gestión de la batería, a la presión de memoria o a actualizaciones del sistema; reiniciar el teléfono también detendrá el servidor.
+
+## Requisitos
+
+Antes de comenzar, asegúrate de disponer de lo siguiente:
+
+- Un teléfono Android.
+- Una cuenta de Cloudflare.
+- Un dominio cuyo DNS se gestione mediante Cloudflare.
+- Un ordenador desde el que conectarte.
+- OpenSSH instalado en el ordenador cliente.
+- Una dirección de correo electrónico autorizada por la política de Cloudflare Access.
+- Acceso físico al teléfono durante la configuración inicial.
+- [Termux, versión 0.118.3](https://f-droid.org/repo/com.termux_1002.apk).
+
+A lo largo de esta guía, `ssh.example.com` representa el nombre de host que quieras utilizar y `<TUNNEL_UUID>` representa el UUID generado por Cloudflare.
+
+Utiliza siempre el mismo nombre de host en:
+
+- La aplicación de Cloudflare Access.
+- La ruta DNS del túnel de Cloudflare.
+- El archivo de configuración del túnel.
+- El comando `cloudflared` del cliente.
+- La configuración del cliente SSH.
+
+## 1. Instalar Termux
+
+Instala Termux desde una de estas fuentes:
+
+- [F-Droid](https://f-droid.org/en/packages/com.termux/).
+- Las versiones oficiales de Termux publicadas en GitHub.
+
+F-Droid es la opción más sencilla para la mayoría de los usuarios.
+
+No mezcles aplicaciones ni complementos de Termux instalados desde fuentes distintas. Por ejemplo, no instales Termux desde F-Droid y Termux:Boot desde GitHub, ya que los paquetes utilizan claves de firma diferentes. Actualmente, el proyecto Termux considera la versión de Google Play una compilación experimental independiente.
+
+Después de instalarlo, abre Termux y deja que complete su configuración inicial.
+
+## 2. Desactivar las restricciones de batería
+
+Abre los ajustes de la aplicación Termux en Android y establece su uso de batería en **Sin restricciones** (**Unrestricted** si Android está en inglés) o exclúyela de la optimización de batería.
+
+La ubicación exacta varía según la versión de Android y el fabricante del dispositivo. En los dispositivos Samsung suele encontrarse en:
 
 ```text
-<TUNNEL_UUID>
+Ajustes → Aplicaciones → Termux → Batería
 ```
 
-with the UUID generated by Cloudflare.
+Termux recomienda desactivar la optimización de batería para los procesos de larga duración.
 
-Use the same hostname consistently in:
-
-* The Cloudflare Access application.
-* The Cloudflare DNS tunnel route.
-* The tunnel configuration file.
-* The client-side `cloudflared` command.
-* The SSH client configuration.
-
-## 1. Install Termux
-
-Install Termux from either:
-
-* [F-Droid](https://f-droid.org/en/packages/com.termux/).
-* The official Termux GitHub releases.
-
-F-Droid is the simplest option for most users.
-
-Do not mix Termux applications or plugins installed from different sources. For example, do not install Termux from F-Droid and Termux:Boot from GitHub because the packages use different signing keys. The Termux project currently treats the Google Play version as a separate, experimental build.
-
-After installation, open Termux and let it complete its initial setup.
-
-## 2. Disable battery restrictions
-
-Open the Android application settings for Termux and set its battery usage to **Unrestricted**, or exclude it from battery optimization.
-
-The exact location varies between Android versions and phone manufacturers. On Samsung devices, it is usually under:
-
-```text
-Settings → Apps → Termux → Battery
-```
-
-Termux recommends disabling battery optimization for long-running processes.
-
-Return to Termux and acquire a wake lock:
+Vuelve a Termux y activa un bloqueo de activación (_wake lock_):
 
 ```bash
 termux-wake-lock
 ```
 
-Approve the battery-optimization request if Android displays one.
+Aprueba la solicitud relacionada con la optimización de batería si Android la muestra.
 
-A wake lock helps keep the processor available while the screen is off, but it does not guarantee that Android will never terminate Termux.
+Un bloqueo de activación ayuda a mantener el procesador activo cuando la pantalla está apagada, pero no puede impedir que Android finalice Termux.
 
-To release the wake lock later, run:
+Para liberar el bloqueo de activación más adelante, ejecuta:
 
 ```bash
 termux-wake-unlock
 ```
 
-## 3. Install Ubuntu 26.04
+## 3. Instalar Ubuntu 26.04
 
-Update the Termux packages:
+Actualiza los paquetes de Termux:
 
 ```bash
 pkg update
 pkg upgrade -y
 ```
 
-Install `proot-distro`:
+Instala `proot-distro`:
 
 ```bash
 pkg install proot-distro -y
 ```
 
-Install a pinned Ubuntu 26.04 image:
+Instala una imagen de Ubuntu 26.04 con la versión fijada:
 
 ```bash
 proot-distro install ubuntu:26.04
 ```
 
-Pinning the image version prevents the guide from unexpectedly installing a newer or development Ubuntu release. The current `proot-distro` documentation uses `ubuntu:26.04` as its Ubuntu example.
+Fijar la versión de la imagen evita que el comando instale de forma inesperada una versión más reciente de Ubuntu o una versión en desarrollo. La documentación actual de `proot-distro` utiliza `ubuntu:26.04` como ejemplo para Ubuntu.
 
-Enter Ubuntu:
+Entra en Ubuntu:
 
 ```bash
 proot-distro login ubuntu
 ```
 
-Your prompt should change, indicating that you are now operating inside Ubuntu.
+El indicador de la línea de comandos debería cambiar para señalar que ahora estás trabajando dentro de Ubuntu.
 
-The remaining server-side commands should be run inside Ubuntu unless a section explicitly says otherwise.
+Los comandos restantes del servidor deben ejecutarse dentro de Ubuntu, salvo que una sección indique expresamente lo contrario.
 
-Verify the installed release:
+Comprueba la versión instalada:
 
 ```bash
 cat /etc/os-release
 ```
 
-The output should identify Ubuntu 26.04.
+La salida debería indicar Ubuntu 26.04.
 
-## 4. Install the Ubuntu packages
+## 4. Instalar los paquetes de Ubuntu
 
-Inside Ubuntu, update the package database and installed packages:
+Dentro de Ubuntu, actualiza la base de datos de paquetes y los paquetes instalados:
 
 ```bash
 apt update
 apt upgrade -y
 ```
 
-Install OpenSSH and the other tools used by this guide:
+Instala OpenSSH y las demás herramientas necesarias para esta guía:
 
 ```bash
 apt install openssh-server nano curl ca-certificates iproute2 procps -y
 ```
 
-The packages provide:
+Estos paquetes cumplen las siguientes funciones:
 
-* `openssh-server`: the SSH server.
-* `nano`: a text editor.
-* `curl`: downloads the Cloudflare signing key.
-* `ca-certificates`: verifies HTTPS certificates.
-* `iproute2`: provides the `ss` networking command.
-* `procps`: provides process-inspection commands such as `pgrep`.
+- `openssh-server`: proporciona el servidor SSH.
+- `nano`: permite editar archivos de texto.
+- `curl`: descarga la clave de firma de Cloudflare.
+- `ca-certificates`: permite verificar certificados HTTPS.
+- `iproute2`: proporciona el comando de red `ss`.
+- `procps`: proporciona comandos de inspección de procesos como `pgrep`.
 
-## 5. Generate an SSH key on the client
+## 5. Generar una clave SSH en el cliente
 
-SSH-key authentication is safer than exposing the Ubuntu root account through password authentication.
+La autenticación mediante clave SSH es más segura que la autenticación con contraseña para la cuenta root de Ubuntu.
 
-Run the following command on the computer that will connect to the phone, not inside Termux.
+Ejecuta el comando correspondiente en el ordenador que se conectará al teléfono, no dentro de Termux.
 
-On Linux, macOS, or Windows PowerShell with OpenSSH installed:
+En Linux o macOS:
 
 ```bash
 ssh-keygen -t ed25519 -a 64 -f ~/.ssh/android-server
 ```
 
-On windows CMD with OpenSSH installed:
-```bash
-windows ssh-keygen -t ed25519 -a 64 -f %USERPROFILE%/.ssh/android-server
+En Windows PowerShell:
+
+```powershell
+ssh-keygen -t ed25519 -a 64 -f "$HOME\.ssh\android-server"
 ```
 
-Enter a passphrase when prompted. A passphrase protects the private key if the computer or key file is compromised.
+En el símbolo del sistema de Windows:
 
-This creates:
-
-```text
-~/.ssh/android-server
-~/.ssh/android-server.pub
+```bat
+ssh-keygen -t ed25519 -a 64 -f "%USERPROFILE%\.ssh\android-server"
 ```
 
-The first file is the private key. Do not share it.
+Introduce una frase de contraseña cuando se solicite. Esta protege la clave privada si el ordenador o el archivo de la clave se ven comprometidos.
 
-The file ending in `.pub` is the public key and can safely be copied to the phone. `ssh-keygen` is the standard OpenSSH utility for creating authentication keys.
+El comando crea dos archivos en el directorio `.ssh`: `android-server` y `android-server.pub`.
 
-Display the public key on Linux or macOS:
+El primer archivo es la clave privada. No la compartas.
+
+El archivo `.pub` es la clave pública y se puede copiar al teléfono de forma segura. `ssh-keygen` es la utilidad estándar de OpenSSH para crear claves de autenticación.
+
+Muestra la clave pública en Linux o macOS:
 
 ```bash
 cat ~/.ssh/android-server.pub
 ```
 
-In Windows PowerShell:
+En Windows PowerShell:
 
 ```powershell
 Get-Content "$HOME\.ssh\android-server.pub"
 ```
 
-Copy the complete line. It should begin with something similar to:
+En el símbolo del sistema de Windows:
 
-```text
-ssh-ed25519
+```bat
+type "%USERPROFILE%\.ssh\android-server.pub"
 ```
 
-## 6. Add the client key to Ubuntu
+Copia la línea completa. Debe comenzar por `ssh-ed25519`.
 
-Return to the Ubuntu session on the phone.
+## 6. Añadir la clave del cliente a Ubuntu
 
-Create the root SSH directory:
+Vuelve a la sesión de Ubuntu en el teléfono.
+
+Crea el directorio `.ssh` del usuario root:
 
 ```bash
 install -d -m 700 /root/.ssh
 ```
 
-Open the authorized-keys file:
+Abre el archivo `authorized_keys`:
 
 ```bash
 nano /root/.ssh/authorized_keys
 ```
 
-Paste the public key copied from the client computer.
+Pega la clave pública que copiaste del ordenador cliente.
 
-The entire key must remain on one line.
+La clave completa debe permanecer en una sola línea.
 
-Save the file with <kbd>Ctrl</kbd>+<kbd>O</kbd>, press <kbd>Enter</kbd>, and exit with <kbd>Ctrl</kbd>+<kbd>X</kbd>.
+Guarda el archivo con <kbd>Ctrl</kbd>+<kbd>O</kbd>, pulsa <kbd>Enter</kbd> y sal con <kbd>Ctrl</kbd>+<kbd>X</kbd>.
 
-Set the required permissions:
+Establece los permisos necesarios:
 
 ```bash
 chmod 600 /root/.ssh/authorized_keys
 ```
 
-Set a strong password for the Ubuntu root account:
+Establece una contraseña segura para la cuenta root de Ubuntu:
 
 ```bash
 passwd
 ```
 
-This ensures that the account is unlocked. The password will not be accepted through SSH after the configuration in the next section disables password authentication.
+Esto garantiza que la cuenta esté desbloqueada. La siguiente sección desactiva la autenticación mediante contraseña, por lo que esta contraseña no se aceptará a través de SSH.
 
-> [!NOTE] Ubuntu root versus Android root
-> The root user in this guide controls the Ubuntu PRoot environment. It does not give the Ubuntu environment root access to the underlying Android operating system.
+> [!NOTE] El usuario root de Ubuntu frente al acceso root de Android
+> El usuario root de esta guía controla el entorno PRoot de Ubuntu. Esto no concede al entorno Ubuntu acceso root al sistema operativo Android subyacente.
 
-## 7. Configure the SSH server
+## 7. Configurar el servidor SSH
 
-Ubuntu supports SSH configuration fragments under:
+Ubuntu admite fragmentos de configuración de SSH en:
 
 ```text
 /etc/ssh/sshd_config.d/
 ```
 
-Create a dedicated configuration file:
+Crea un archivo de configuración específico:
 
 ```bash
 nano /etc/ssh/sshd_config.d/99-android-server.conf
 ```
 
-Add:
+Añade los siguientes ajustes:
 
 ```text
 Port 2022
@@ -295,50 +283,50 @@ PermitEmptyPasswords no
 PermitRootLogin prohibit-password
 ```
 
-Save and exit.
+Guarda el archivo y sal.
 
-This configuration:
+Esta configuración:
 
-* Runs SSH on port `2022`.
-* Restricts the SSH listener to the phone's loopback interface.
-* Allows SSH keys.
-* Disables password and keyboard-interactive authentication.
-* Allows root login only through non-password authentication.
+- Ejecuta SSH en el puerto `2022`.
+- Limita el servicio de escucha SSH a la interfaz de bucle local (_loopback_) del teléfono.
+- Habilita la autenticación mediante clave pública.
+- Deshabilita la autenticación mediante contraseña y la interactiva por teclado.
+- Permite iniciar sesión como root únicamente mediante autenticación por clave pública.
 
-`PermitRootLogin prohibit-password` allows root key authentication while disabling password and keyboard-interactive authentication for root.
+`PermitRootLogin prohibit-password` permite iniciar sesión como root mediante autenticación por clave pública y deshabilita para root la autenticación mediante contraseña y la interactiva por teclado.
 
-Because SSH listens only on `127.0.0.1`, other devices on the phone's Wi-Fi network cannot connect directly to port `2022`. Cloudflare Tunnel will connect to the local listener instead.
+Como SSH solo escucha en `127.0.0.1`, los demás dispositivos de la red Wi-Fi del teléfono no pueden conectarse directamente al puerto `2022`. En su lugar, el túnel de Cloudflare se conectará al servicio de escucha local.
 
-Generate the SSH server host keys:
+Genera las claves de host del servidor SSH:
 
 ```bash
 ssh-keygen -A
 ```
 
-Create the SSH privilege-separation directory:
+Crea el directorio de separación de privilegios de SSH:
 
 ```bash
 install -d -m 0755 /run/sshd
 ```
 
-OpenSSH uses `/run/sshd` during its pre-authentication privilege-separation process.
+OpenSSH utiliza `/run/sshd` durante el proceso de separación de privilegios previo a la autenticación.
 
-Validate the SSH configuration:
+Valida la configuración de SSH:
 
 ```bash
 /usr/sbin/sshd -t
 ```
 
-No output means that the configuration passed validation.
+Si no aparece ninguna salida, la configuración ha superado la validación.
 
-Inspect the effective settings:
+Inspecciona los ajustes efectivos:
 
 ```bash
 /usr/sbin/sshd -T | grep -E \
   '^(port|listenaddress|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|permitrootlogin) '
 ```
 
-The output should include settings similar to:
+La salida debería incluir ajustes similares a estos:
 
 ```text
 port 2022
@@ -349,178 +337,183 @@ kbdinteractiveauthentication no
 permitrootlogin without-password
 ```
 
-OpenSSH may display `without-password` as an internal alias for `prohibit-password`.
+OpenSSH puede mostrar `without-password`, un alias obsoleto de `prohibit-password`.
 
-Start the SSH server:
+Inicia el servidor SSH:
 
 ```bash
 /usr/sbin/sshd
 ```
 
-Verify that it is running:
+Comprueba que se esté ejecutando:
 
 ```bash
 pgrep -a sshd
 ```
 
-Verify that it is listening on port `2022`:
+Comprueba que esté escuchando en el puerto `2022`:
 
 ```bash
 ss -ltnp | grep ':2022'
 ```
 
-The listening address should be `127.0.0.1:2022`, not `0.0.0.0:2022`.
+La dirección de escucha debe ser `127.0.0.1:2022`, no `0.0.0.0:2022`.
 
-> [!WARNING] Do not enable password login
-> Do not change `PasswordAuthentication` to `yes` merely to make troubleshooting easier. Validate the public key, file permissions, and selected private key instead.
+> [!WARNING] No habilites el inicio de sesión mediante contraseña
+> No cambies `PasswordAuthentication` a `yes` solo para facilitar la resolución de problemas. En su lugar, valida la clave pública, los permisos de los archivos y la clave privada seleccionada.
 
-## 8. Install `cloudflared`
+## 8. Instalar `cloudflared`
 
-Still inside Ubuntu, create the package-key directory:
+Sin salir de Ubuntu, crea el directorio de llaveros de APT:
 
 ```bash
 mkdir -p --mode=0755 /usr/share/keyrings
 ```
 
-Download Cloudflare's package-signing key:
+Descarga la clave de firma de paquetes de Cloudflare:
 
 ```bash
 curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
   | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
 ```
 
-Add Cloudflare's stable distribution-independent repository:
+Añade el repositorio estable de Cloudflare, independiente de la distribución:
 
 ```bash
 echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' \
   | tee /etc/apt/sources.list.d/cloudflared.list
 ```
 
-Update the package database and install `cloudflared`:
+Actualiza la base de datos de paquetes e instala `cloudflared`:
 
 ```bash
 apt-get update
 apt-get install cloudflared -y
 ```
 
-The `any` repository avoids tying the Cloudflare package source to a specific Ubuntu release name. Cloudflare publishes both stable and nightly package channels; this guide uses the stable channel.
+El uso de la suite `any` evita vincular la fuente de paquetes de Cloudflare al nombre de una versión concreta de Ubuntu. Cloudflare publica tanto un canal estable como otro de compilaciones nocturnas; esta guía utiliza el estable.
 
-Verify the installation:
+Comprueba la instalación:
 
 ```bash
 cloudflared --version
 ```
 
-## 9. Authenticate `cloudflared`
+## 9. Autenticar `cloudflared`
 
-Run:
+Ejecuta:
 
 ```bash
 cloudflared tunnel login
 ```
 
-Cloudflare will attempt to open a browser. Inside the PRoot environment, it may instead print a URL.
+`cloudflared` intentará abrir un navegador. Dentro del entorno PRoot, puede que el comando
+muestre una URL en su lugar.
 
-When a URL is displayed:
+Cuando se muestre una URL:
 
-1. Copy it.
-2. Open it in the Android browser or on another computer.
-3. Sign in to the correct Cloudflare account.
-4. Select the domain that will contain `ssh.example.com`.
-5. Return to Termux after Cloudflare confirms authorization.
+1. Cópiala.
+2. Ábrela en el navegador de Android o en otro ordenador.
+3. Inicia sesión en la cuenta de Cloudflare correcta.
+4. Selecciona el dominio de `ssh.example.com`.
+5. Vuelve a Termux después de que Cloudflare confirme la autorización.
 
-The command creates an account certificate named:
+El comando crea un certificado de cuenta en:
 
 ```text
 /root/.cloudflared/cert.pem
 ```
 
-Cloudflare documents that `cloudflared tunnel login` opens an authentication page and creates `cert.pem` in the default `cloudflared` directory.
+Cloudflare documenta que `cloudflared tunnel login` abre una página de autenticación y crea
+`cert.pem` en el directorio predeterminado de `cloudflared`.
 
-> [!WARNING] Protect `cert.pem`
-> The account certificate authorizes tunnel-management actions in your Cloudflare account. Do not publish, email, or commit it to a repository.
+> [!WARNING] Protege `cert.pem`
+> El certificado de cuenta autoriza acciones de administración de túneles en tu cuenta de
+> Cloudflare. No lo publiques, no lo envíes por correo electrónico ni lo añadas a un repositorio.
 
-Protect the directory and certificate:
+Protege el directorio y el certificado:
 
 ```bash
 chmod 700 /root/.cloudflared
 chmod 600 /root/.cloudflared/cert.pem
 ```
 
-## 10. Create the Cloudflare Tunnel
+## 10. Crear el túnel de Cloudflare
 
-Create a locally managed tunnel:
+Crea un túnel gestionado localmente:
 
 ```bash
 cloudflared tunnel create android-server
 ```
 
-The command prints a tunnel UUID similar to:
+El comando muestra un UUID de túnel similar a:
 
 ```text
 12345678-1234-1234-1234-123456789abc
 ```
 
-It also creates a credentials file:
+También crea un archivo de credenciales:
 
 ```text
 /root/.cloudflared/<TUNNEL_UUID>.json
 ```
 
-The tunnel UUID identifies the tunnel, while the JSON file contains the credentials required to run it.
+El UUID del túnel identifica el túnel, mientras que el archivo JSON contiene las credenciales
+necesarias para ejecutarlo.
 
-Protect the credentials file:
+Protege el archivo de credenciales:
 
 ```bash
 chmod 600 /root/.cloudflared/<TUNNEL_UUID>.json
 ```
 
-Record the UUID. It will be used in several later commands.
+Anota el UUID. Se utilizará en varios comandos posteriores.
 
-You can list the tunnels at any time with:
+Puedes consultar la lista de túneles en cualquier momento con:
 
 ```bash
 cloudflared tunnel list
 ```
 
-## 11. Create the Cloudflare Access application
+## 11. Crear la aplicación de Cloudflare Access
 
-Create the Access application **before publishing the DNS route**. This prevents the hostname from being briefly available without an Access policy.
+Crea la aplicación de Access **antes de publicar la ruta DNS**, tal como recomienda Cloudflare.
+Esto evita que el nombre de host quede disponible brevemente sin una política de Access. Las
+aplicaciones de Access deniegan el acceso de forma predeterminada y, para conectarse, un usuario
+debe cumplir los criterios de una política **Allow**.
 
-Cloudflare recommends creating the Access application before publishing the tunnel route. Access applications deny access by default, and a user must match an Allow policy to connect.
-
-Open the Cloudflare dashboard and go to:
+Abre el panel de Cloudflare y ve a:
 
 ```text
 Zero Trust → Access controls → Applications
 ```
 
-Then:
+A continuación:
 
-1. Select **Create new application**.
+1. Selecciona **Create new application**.
 
-2. Select **Self-hosted and private**.
+2. Selecciona **Self-hosted and private**.
 
-3. Select **Add public hostname**.
+3. Selecciona **Add public hostname**.
 
-4. Enter an application name such as:
+4. Introduce un nombre para la aplicación, como:
 
    ```text
    Android Ubuntu SSH
    ```
 
-5. Select your domain.
+5. Selecciona tu dominio.
 
-6. Enter the subdomain portion of the hostname.
+6. Introduce la parte del nombre de host correspondiente al subdominio.
 
-For `ssh.example.com`, use:
+Para `ssh.example.com`, utiliza:
 
 ```text
 Subdomain: ssh
 Domain: example.com
 ```
 
-Under **Access policies**, create a policy with:
+En **Access policies**, crea una política con:
 
 ```text
 Policy name: Only me
@@ -529,50 +522,54 @@ Include selector: Emails
 Value: your-email@example.com
 ```
 
-Use the exact email address with which you will authenticate.
+Introduce la dirección de correo electrónico exacta que utilizarás para autenticarte.
 
-Do not use an Allow policy containing **Everyone** unless the application is intentionally available to every user who can authenticate.
+No configures una política con la acción **Allow** y el selector **Everyone**, a menos que la aplicación deba estar
+disponible expresamente para todos los usuarios que puedan autenticarse.
 
-Under authentication methods, select either:
+Como método de autenticación, selecciona una de las siguientes opciones:
 
-* Cloudflare One-time PIN.
-* An identity provider already configured in your Zero Trust account.
+- Cloudflare One-time PIN.
+- Un proveedor de identidad ya configurado en tu cuenta de Zero Trust.
 
-Cloudflare One-time PIN can send a login code to an approved email address without requiring a separate third-party identity-provider integration.
+Cloudflare One-time PIN envía un código de inicio de sesión a una dirección de correo electrónico
+autorizada sin necesidad de integrar por separado un proveedor de identidad externo.
 
-Choose an appropriate session duration and create the application.
+Elige una duración de sesión adecuada y crea la aplicación.
 
-The resulting Access application hostname must exactly match:
+El nombre de host configurado para la aplicación de Access debe coincidir exactamente con:
 
 ```text
 ssh.example.com
 ```
 
-Cloudflare's current application workflow places the policy directly inside the self-hosted application configuration under **Access policies**.
+En el flujo de aplicaciones actual de Cloudflare, la política aparece directamente en **Access
+policies**, dentro de la configuración de la aplicación autohospedada.
 
-## 12. Create the tunnel DNS route
+## 12. Crear la ruta DNS del túnel
 
-Return to Ubuntu in Termux.
+Vuelve a Ubuntu en Termux.
 
-Create the DNS route:
+Crea la ruta DNS:
 
 ```bash
 cloudflared tunnel route dns android-server ssh.example.com
 ```
 
-This creates a Cloudflare DNS record that associates `ssh.example.com` with the tunnel.
+Esto crea un registro DNS de Cloudflare que asocia `ssh.example.com` con el túnel.
 
-The route does not contain the local SSH port. The local service and port are defined in the tunnel configuration file.
+La ruta no contiene el puerto SSH local. El servicio y el puerto locales se definen en el archivo de
+configuración del túnel.
 
-## 13. Configure the tunnel
+## 13. Configurar el túnel
 
-Create or open the tunnel configuration file:
+Crea o abre el archivo de configuración del túnel:
 
 ```bash
 nano /root/.cloudflared/config.yml
 ```
 
-Add:
+Añade:
 
 ```yaml
 tunnel: <TUNNEL_UUID>
@@ -584,9 +581,9 @@ ingress:
   - service: http_status:404
 ```
 
-Replace both `<TUNNEL_UUID>` placeholders with the real UUID.
+Sustituye ambos marcadores de posición `<TUNNEL_UUID>` por el UUID real.
 
-For example:
+Por ejemplo:
 
 ```yaml
 tunnel: 12345678-1234-1234-1234-123456789abc
@@ -598,116 +595,111 @@ ingress:
   - service: http_status:404
 ```
 
-The final catch-all rule is required so unmatched hostnames receive an HTTP `404` response instead of being sent to the SSH service.
+La regla comodín final es necesaria para que las solicitudes cuyo nombre de host no coincida con
+ninguna regla reciban una respuesta HTTP `404` en lugar de reenviarse al servicio SSH.
 
-This guide uses:
+Esta guía utiliza el tipo de servicio TCP (`tcp://127.0.0.1:2022`) porque el cliente se conecta con
+`cloudflared access tcp`.
 
-```yaml
-service: tcp://127.0.0.1:2022
-```
-
-because the client will connect with:
-
-```bash
-cloudflared access tcp
-```
-
-Cloudflare supports both TCP and SSH service types:
+Cloudflare admite los tipos de servicio TCP y SSH:
 
 ```yaml
 tcp://127.0.0.1:2022
 ssh://127.0.0.1:2022
 ```
 
-They are not interchangeable from the client's perspective. TCP routes use `cloudflared access tcp`, while SSH routes use `cloudflared access ssh`.
+No son intercambiables desde la perspectiva del cliente. Las rutas TCP utilizan
+`cloudflared access tcp`, mientras que las rutas SSH utilizan `cloudflared access ssh`.
 
-Protect the configuration:
+Protege la configuración:
 
 ```bash
 chmod 600 /root/.cloudflared/config.yml
 ```
 
-Validate the ingress configuration:
+Valida la configuración de entrada:
 
 ```bash
 cloudflared tunnel ingress validate
 ```
 
-A successful result should say:
+Un resultado correcto debería indicar:
 
 ```text
 Validating rules from /root/.cloudflared/config.yml
 OK
 ```
 
-Test which rule matches the hostname:
+Comprueba qué regla coincide con el nombre de host:
 
 ```bash
 cloudflared tunnel ingress rule https://ssh.example.com
 ```
 
-It should match the rule whose service is:
+Debería coincidir con la regla cuyo servicio es:
 
 ```text
 tcp://127.0.0.1:2022
 ```
 
-Cloudflare provides both commands for validating and testing local ingress configurations.
+Cloudflare proporciona ambos comandos para validar y comprobar configuraciones de entrada
+locales.
 
-## 14. Start the server and tunnel
+## 14. Iniciar el servidor y el túnel
 
-Confirm that SSH is running:
+Confirma que SSH esté en ejecución:
 
 ```bash
 pgrep -x sshd >/dev/null || /usr/sbin/sshd
 ```
 
-Start the Cloudflare Tunnel:
+Inicia el túnel de Cloudflare:
 
 ```bash
 cloudflared tunnel run <TUNNEL_UUID>
 ```
 
-Alternatively, because the tunnel has a name, you can use:
+También puedes ejecutar el túnel por su nombre:
 
 ```bash
 cloudflared tunnel run android-server
 ```
 
-Leave this command running.
+Deja este comando en ejecución.
 
-The tunnel is available only while:
+El túnel solo está disponible mientras se cumplan todas las condiciones siguientes:
 
-* Termux is running.
-* The Ubuntu PRoot environment is running.
-* `sshd` is running.
-* `cloudflared` is running.
-* The phone has an Internet connection.
+- Termux está en ejecución.
+- El entorno PRoot de Ubuntu está en ejecución.
+- `sshd` está en ejecución.
+- `cloudflared` está en ejecución.
+- El teléfono tiene conexión a Internet.
 
-`cloudflared` runs in the foreground. Pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> stops the tunnel.
+`cloudflared` se ejecuta en primer plano. Pulsar <kbd>Ctrl</kbd>+<kbd>C</kbd> detiene el túnel.
 
-## 15. Install `cloudflared` on the client computer
+## 15. Instalar `cloudflared` en el ordenador cliente
 
-Install `cloudflared` on every computer that will connect to the server.
+Instala `cloudflared` en cada ordenador que vaya a conectarse al servidor.
 
-Cloudflare's arbitrary-TCP connection method requires `cloudflared` on both the server and client.
+El método de Cloudflare para conexiones TCP de cualquier tipo requiere `cloudflared` tanto en el
+servidor como en el cliente.
 
-After installation, verify it:
+Verifica la instalación:
 
 ```bash
 cloudflared --version
 ```
 
-The client also needs:
+El cliente también necesita:
 
-* A browser.
-* OpenSSH.
-* The private key generated earlier.
-* Permission to authenticate through the Cloudflare Access policy.
+- Un navegador.
+- OpenSSH.
+- La clave privada generada anteriormente.
+- Permiso para autenticarse mediante la política de Cloudflare Access.
 
-## 16. Start the client-side TCP relay
+## 16. Iniciar el relé TCP del cliente
 
-On the client computer, open a terminal and run:
+En el ordenador cliente, abre un terminal y ejecuta:
 
 ```bash
 cloudflared access tcp \
@@ -715,25 +707,27 @@ cloudflared access tcp \
   --url 127.0.0.1:9000
 ```
 
-Keep this terminal open.
+Mantén abierto este terminal.
 
-The command creates a local TCP listener on:
+El comando crea un socket de escucha TCP local en:
 
 ```text
 127.0.0.1:9000
 ```
 
-It forwards connections through Cloudflare Access and the tunnel to:
+El relé reenvía las conexiones mediante Cloudflare Access y el túnel a la siguiente dirección
+dentro de Ubuntu en el teléfono:
 
 ```text
 127.0.0.1:2022
 ```
 
-inside Ubuntu on the phone.
+Cuando se inicia el relé, `cloudflared` abre una ventana del navegador para la autenticación. Según
+tu configuración de Access, inicia sesión mediante el proveedor de identidad o introduce el PIN de
+un solo uso enviado a tu correo electrónico. Cloudflare documenta este flujo de autenticación
+mediante navegador para `cloudflared access tcp`.
 
-When the relay starts, `cloudflared` opens a browser window and asks you to authenticate. Depending on your Access configuration, complete the identity-provider login or enter the one-time PIN sent to your email. Cloudflare documents this browser-based authentication flow for `cloudflared access tcp`.
-
-If port `9000` is already in use, select another local port:
+Si el puerto `9000` ya está en uso, selecciona otro puerto local:
 
 ```bash
 cloudflared access tcp \
@@ -741,13 +735,13 @@ cloudflared access tcp \
   --url 127.0.0.1:9001
 ```
 
-Use the same replacement port in the SSH command and VS Code configuration.
+Utiliza ese nuevo puerto tanto en el comando SSH como en la configuración de VS Code.
 
-## 17. Connect with SSH
+## 17. Conectarse mediante SSH
 
-Open a second terminal on the client computer.
+Abre un segundo terminal en el ordenador cliente.
 
-Connect through the local relay:
+Conéctate mediante el relé local:
 
 ```bash
 ssh \
@@ -757,47 +751,47 @@ ssh \
   root@127.0.0.1
 ```
 
-On the first connection, OpenSSH will display the server's host-key fingerprint.
+En la primera conexión, OpenSSH mostrará la huella digital de la clave de host del servidor.
 
-Review it and enter:
+Antes de aceptarla, muestra desde Ubuntu en el teléfono la huella digital esperada de la clave de
+host Ed25519:
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Compara las dos huellas digitales. Si coinciden, introduce:
 
 ```text
 yes
 ```
 
-when you are satisfied that you are connecting to the expected server.
+Introduce la frase de contraseña de la clave privada SSH si se te solicita.
 
-Enter the SSH private-key passphrase if prompted.
+A continuación, deberías obtener un intérprete de comandos de Ubuntu en el teléfono Android.
 
-You should then receive an Ubuntu shell on the Android phone.
+La opción `HostKeyAlias` indica a OpenSSH que almacene y busque la clave de host del servidor con
+el alias `ssh.example.com` en lugar de `[127.0.0.1]:9000`.
 
-The `HostKeyAlias` option causes the server key to be stored under:
+## 18. Conectarse desde VS Code
 
-```text
-ssh.example.com
-```
+Instala la extensión **Remote - SSH** en Visual Studio Code.
 
-instead of treating it as the identity of an arbitrary service running on local port `9000`.
+Abre tu archivo de configuración de SSH:
 
-## 18. Connect from VS Code
-
-Install the **Remote - SSH** extension in Visual Studio Code.
-
-Open your SSH configuration file:
-
-On Linux or macOS:
+En Linux o macOS:
 
 ```text
 ~/.ssh/config
 ```
 
-On Windows:
+En Windows:
 
 ```text
 %USERPROFILE%\.ssh\config
 ```
 
-Add:
+Añade lo siguiente:
 
 ```ssh-config
 Host android-server
@@ -811,7 +805,7 @@ Host android-server
   ServerAliveCountMax 3
 ```
 
-Before connecting from VS Code, start the relay and leave it running:
+Antes de conectarte desde VS Code, inicia el relé y déjalo en ejecución:
 
 ```bash
 cloudflared access tcp \
@@ -819,28 +813,28 @@ cloudflared access tcp \
   --url 127.0.0.1:9000
 ```
 
-Then:
+A continuación:
 
-1. Open the VS Code Command Palette.
-2. Select **Remote-SSH: Connect to Host...**
-3. Select `android-server`.
-4. Complete Cloudflare authentication if requested.
-5. Enter the private-key passphrase if requested.
+1. Abre la paleta de comandos de VS Code.
+2. Selecciona **Remote-SSH: Connect to Host...**
+3. Selecciona `android-server`.
+4. Completa la autenticación de Cloudflare si se solicita.
+5. Introduce la frase de contraseña de la clave privada si se solicita.
 
-> [!NOTE] Relay requirement
-> VS Code does not start the `cloudflared access tcp` relay from this configuration. The relay terminal must remain open for the duration of the VS Code session.
+> [!NOTE] Requisito del relé
+> VS Code no inicia el relé `cloudflared access tcp` desde esta configuración. El terminal del relé debe permanecer abierto durante toda la sesión de VS Code.
 
-## 19. Create a server startup script
+## 19. Crear un script de inicio del servidor
 
-Instead of manually starting SSH and the tunnel each time, create a script inside Ubuntu.
+En lugar de iniciar SSH y el túnel manualmente cada vez, crea un script dentro de Ubuntu.
 
-Open:
+Abre el script en `nano`:
 
 ```bash
 nano /root/start-android-server.sh
 ```
 
-Add:
+Añade el siguiente contenido:
 
 ```bash
 #!/usr/bin/env bash
@@ -858,29 +852,29 @@ fi
 exec cloudflared tunnel run <TUNNEL_UUID>
 ```
 
-Replace `<TUNNEL_UUID>` with the real UUID.
+Sustituye `<TUNNEL_UUID>` por el UUID real.
 
-Make the script executable:
+Haz que el script sea ejecutable:
 
 ```bash
 chmod 700 /root/start-android-server.sh
 ```
 
-Exit Ubuntu:
+Sal de Ubuntu:
 
 ```bash
 exit
 ```
 
-You should now be back in the regular Termux shell.
+Ahora deberías estar de nuevo en el intérprete de comandos habitual de Termux.
 
-Create a Termux wrapper:
+Crea un script lanzador para Termux:
 
 ```bash
 nano ~/start-android-server.sh
 ```
 
-Add:
+Añade el siguiente contenido:
 
 ```bash
 #!/data/data/com.termux/files/usr/bin/bash
@@ -893,50 +887,48 @@ exec proot-distro login ubuntu -- \
   /root/start-android-server.sh
 ```
 
-Save the file and make it executable:
+Guarda el archivo y haz que sea ejecutable:
 
 ```bash
 chmod 700 ~/start-android-server.sh
 ```
 
-You can now start the complete server from Termux with:
+Ahora puedes iniciar el servidor y el túnel desde Termux con:
 
 ```bash
 ~/start-android-server.sh
 ```
 
-## 20. Optional: start automatically with Termux:Boot
+## 20. Opcional: iniciar automáticamente con Termux:Boot
 
-Install Termux:Boot from the same source used to install Termux.
+Instala Termux:Boot desde la misma fuente que utilizaste para instalar Termux.
 
-For example:
+Por ejemplo:
 
-* If Termux came from F-Droid, install Termux:Boot from F-Droid.
-* If Termux came from GitHub, install Termux:Boot from GitHub.
+- Si instalaste Termux desde F-Droid, instala Termux:Boot desde F-Droid.
+- Si instalaste Termux desde GitHub, instala Termux:Boot desde GitHub.
 
-Open the Termux:Boot application once after installing it. This initializes its boot integration.
+Abre la aplicación Termux:Boot una vez después de instalarla, tal como recomienda la documentación del proyecto. Esto inicializa su integración con el arranque.
 
-Termux:Boot runs executable scripts placed in:
+Termux:Boot ejecuta los scripts ejecutables ubicados en:
 
 ```text
 ~/.termux/boot/
 ```
 
-The project's documentation recommends starting the application once and optionally acquiring a wake lock from boot scripts.
-
-In the normal Termux shell, create the boot directory:
+En el intérprete de comandos habitual de Termux, crea el directorio de arranque:
 
 ```bash
 mkdir -p ~/.termux/boot
 ```
 
-Create the boot script:
+Crea el script de arranque:
 
 ```bash
 nano ~/.termux/boot/start-android-server
 ```
 
-Add:
+Añade el siguiente contenido:
 
 ```bash
 #!/data/data/com.termux/files/usr/bin/bash
@@ -950,174 +942,161 @@ nohup proot-distro login ubuntu -- \
   >> "$HOME/android-server.log" 2>&1 &
 ```
 
-Make it executable:
+Haz que sea ejecutable:
 
 ```bash
 chmod 700 ~/.termux/boot/start-android-server
 ```
 
-After the phone reboots, Termux:Boot should attempt to start the Ubuntu server and tunnel.
+Después de reiniciar el teléfono, Termux:Boot debería intentar iniciar el servidor de Ubuntu y el túnel.
 
-View the startup log with:
+Consulta el registro de inicio con:
 
 ```bash
 cat ~/android-server.log
 ```
 
-> [!WARNING] Automatic startup limitations
-> Automatic startup depends on Android and the phone manufacturer's background-execution rules. A boot script does not guarantee uninterrupted availability. Some devices may require the phone to be unlocked once after reboot.
+> [!WARNING] Limitaciones del inicio automático
+> El inicio automático depende de las políticas de ejecución en segundo plano de Android y de cualquier restricción adicional impuesta por el fabricante del dispositivo. Un script de arranque no garantiza una disponibilidad ininterrumpida. Algunos dispositivos pueden requerir que se desbloquee el teléfono una vez después de reiniciarlo.
 
-## 21. Stop the server
+## 21. Detener el servidor
 
-When `cloudflared` is running in the foreground, press:
+Cuando `cloudflared` se esté ejecutando en primer plano, pulsa <kbd>Ctrl</kbd>+<kbd>C</kbd> para detener el túnel.
 
-```text
-Ctrl+C
-```
-
-to stop the tunnel.
-
-To stop the SSH server from inside Ubuntu:
+Para detener el servidor SSH desde Ubuntu:
 
 ```bash
 pkill sshd
 ```
 
-To release the Termux wake lock after exiting Ubuntu:
+Para liberar el bloqueo de activación de Termux después de salir de Ubuntu:
 
 ```bash
 termux-wake-unlock
 ```
 
-## 22. Update the server
+## 22. Actualizar el servidor
 
-Update Termux packages from the normal Termux shell:
+Actualiza los paquetes de Termux desde el intérprete de comandos habitual de Termux:
 
 ```bash
 pkg update
 pkg upgrade -y
 ```
 
-Enter Ubuntu:
+Entra en Ubuntu:
 
 ```bash
 proot-distro login ubuntu
 ```
 
-Update Ubuntu and `cloudflared`:
+Actualiza los paquetes de Ubuntu, incluido `cloudflared`:
 
 ```bash
 apt update
 apt upgrade -y
 ```
 
-Restart the tunnel after updating `cloudflared`.
+Reinicia el túnel después de actualizar `cloudflared`.
 
-Updating or restarting `cloudflared` interrupts active TCP and SSH connections.
+Actualizar o reiniciar `cloudflared` interrumpe las conexiones TCP y SSH activas.
 
-## 23. Security checklist
+## 23. Lista de comprobación de seguridad
 
-Before relying on the server remotely, verify all of the following:
+Antes de confiar en el servidor para acceder de forma remota, comprueba lo siguiente:
 
-* Termux came from F-Droid or the official GitHub releases.
-* Termux plugins came from the same source as Termux.
-* The SSH server listens only on `127.0.0.1:2022`.
-* `PasswordAuthentication` is set to `no`.
-* `KbdInteractiveAuthentication` is set to `no`.
-* `PermitRootLogin` is set to `prohibit-password`.
-* `/root/.ssh` has permission `700`.
-* `/root/.ssh/authorized_keys` has permission `600`.
-* The Cloudflare Access application matches the exact hostname.
-* The Access Allow policy contains only authorized identities.
-* The policy does not broadly Allow `Everyone`.
-* `/root/.cloudflared` has permission `700`.
-* `cert.pem`, `config.yml`, and the tunnel JSON file have permission `600`.
-* The client private key is protected with a passphrase.
-* The private key, `cert.pem`, and tunnel JSON file are never committed to source control.
+- Termux procede de F-Droid o de las versiones oficiales de GitHub.
+- Los complementos de Termux proceden de la misma fuente que Termux.
+- El servidor SSH solo escucha en `127.0.0.1:2022`.
+- `PasswordAuthentication` está configurado como `no`.
+- `KbdInteractiveAuthentication` está configurado como `no`.
+- `PermitRootLogin` está configurado como `prohibit-password`.
+- `/root/.ssh` tiene los permisos establecidos en `700`.
+- `/root/.ssh/authorized_keys` tiene los permisos establecidos en `600`.
+- El nombre de host configurado para la aplicación de Cloudflare Access coincide exactamente con el nombre de host del túnel y del cliente.
+- La política de Access con la acción **Allow** solo contiene identidades autorizadas y no utiliza el selector **Everyone**.
+- `/root/.cloudflared` tiene los permisos establecidos en `700`.
+- `cert.pem`, `config.yml` y el archivo JSON del túnel tienen los permisos establecidos en `600`.
+- La clave privada del cliente está protegida con una frase de contraseña.
+- La clave privada, `cert.pem` y el archivo JSON del túnel nunca se añaden al control de versiones.
 
-## 24. Troubleshooting
+## 24. Solución de problemas
 
-### `sshd` reports that no host keys are available
+### `sshd` indica que no hay claves de host disponibles
 
-Generate the server host keys:
+Genera las claves de host del servidor:
 
 ```bash
 ssh-keygen -A
 ```
 
-Then validate and start SSH:
+A continuación, valida la configuración e inicia SSH:
 
 ```bash
 /usr/sbin/sshd -t
 /usr/sbin/sshd
 ```
 
-### `sshd` reports a missing privilege-separation directory
+### `sshd` indica que falta un directorio para la separación de privilegios
 
-Create it:
+Créalo:
 
 ```bash
 install -d -m 0755 /run/sshd
 ```
 
-Then start SSH again:
+A continuación, vuelve a iniciar SSH:
 
 ```bash
 /usr/sbin/sshd
 ```
 
-### SSH is not listening on port 2022
+### SSH no escucha en el puerto 2022
 
-Check the effective configuration:
+Comprueba la configuración efectiva:
 
 ```bash
 /usr/sbin/sshd -T | grep -E '^(port|listenaddress) '
 ```
 
-Check the process:
+Comprueba el proceso:
 
 ```bash
 pgrep -a sshd
 ```
 
-Check the listening socket:
+Comprueba el socket de escucha:
 
 ```bash
 ss -ltnp | grep ':2022'
 ```
 
-Restart SSH:
+Reinicia SSH:
 
 ```bash
 pkill sshd 2>/dev/null || true
 /usr/sbin/sshd
 ```
 
-### SSH reports `Permission denied (publickey)`
+### SSH muestra `Permission denied (publickey)`
 
-Check the directory and file permissions:
+Comprueba los permisos del directorio y del archivo:
 
 ```bash
 ls -ld /root/.ssh
 ls -l /root/.ssh/authorized_keys
 ```
 
-Correct them:
+Corrígelos:
 
 ```bash
 chmod 700 /root/.ssh
 chmod 600 /root/.ssh/authorized_keys
 ```
 
-Confirm that the authorized-keys file contains the same public key as:
+Confirma que la clave pública de `authorized_keys` coincide con la clave pública almacenada en el archivo `android-server.pub` del cliente.
 
-```text
-~/.ssh/android-server.pub
-```
-
-on the client.
-
-Make sure the SSH client is using the correct private key:
+Asegúrate de que el cliente SSH utiliza la clave privada correcta:
 
 ```bash
 ssh -vvv \
@@ -1127,66 +1106,66 @@ ssh -vvv \
   root@127.0.0.1
 ```
 
-### `cloudflared tunnel login` does not open a browser
+### `cloudflared tunnel login` no abre un navegador
 
-Copy the URL displayed in the terminal and open it manually in the Android browser or on another computer.
+Copia la URL que aparece en el terminal y ábrela manualmente en el navegador de Android o en otro ordenador.
 
-After completing authentication, confirm that the certificate exists:
+Después de completar la autenticación, confirma que el certificado existe:
 
 ```bash
 ls -l /root/.cloudflared/cert.pem
 ```
 
-### The tunnel cannot find its credentials
+### El túnel no encuentra sus credenciales
 
-Confirm that the UUID in `config.yml` matches the JSON filename:
+Confirma que el UUID de `config.yml` coincide con el nombre del archivo JSON:
 
 ```bash
 ls -l /root/.cloudflared
 cat /root/.cloudflared/config.yml
 ```
 
-The values should correspond:
+Los valores deben coincidir:
 
 ```yaml
 tunnel: <TUNNEL_UUID>
 credentials-file: /root/.cloudflared/<TUNNEL_UUID>.json
 ```
 
-### The Access page says you are not allowed
+### La página de Access indica que no tienes permiso
 
-Verify:
+Comprueba lo siguiente:
 
-* The Access application's hostname is exactly `ssh.example.com`.
-* The Allow policy contains the email used during login.
-* The policy action is **Allow**.
-* The selected authentication method is enabled.
-* The policy is attached to the correct application.
-* The Access application has been saved.
+- El nombre de host de la aplicación de Access es exactamente `ssh.example.com`.
+- La política contiene el correo electrónico utilizado durante el inicio de sesión.
+- La acción de la política es **Allow**.
+- El método de autenticación seleccionado está habilitado.
+- La política está asociada a la aplicación correcta.
+- La aplicación de Access se ha guardado.
 
-Access applications deny access by default unless a user matches an Allow policy.
+Las aplicaciones de Access deniegan el acceso de forma predeterminada a menos que un usuario cumpla los criterios de una política con la acción **Allow**.
 
-### The client relay connects, but SSH fails
+### El relé del cliente se conecta, pero SSH falla
 
-Confirm that all four values match:
+Confirma que los tres valores del nombre de host coinciden y que el servicio local está configurado exactamente como se muestra:
 
 ```text
-Tunnel hostname:       ssh.example.com
-Access application:    ssh.example.com
-Client hostname:       ssh.example.com
-Tunnel local service:  tcp://127.0.0.1:2022
+Nombre de host del túnel:   ssh.example.com
+Aplicación de Access:       ssh.example.com
+Nombre de host del cliente: ssh.example.com
+Servicio local del túnel:   tcp://127.0.0.1:2022
 ```
 
-Validate the tunnel configuration:
+Valida la configuración del túnel:
 
 ```bash
 cloudflared tunnel ingress validate
 cloudflared tunnel ingress rule https://ssh.example.com
 ```
 
-### Port 9000 is already in use
+### El puerto 9000 ya está en uso
 
-Use another local port:
+Utiliza otro puerto local:
 
 ```bash
 cloudflared access tcp \
@@ -1194,7 +1173,7 @@ cloudflared access tcp \
   --url 127.0.0.1:9001
 ```
 
-Then connect with:
+A continuación, conéctate con:
 
 ```bash
 ssh \
@@ -1204,13 +1183,13 @@ ssh \
   root@127.0.0.1
 ```
 
-Update the VS Code SSH configuration to use the same port.
+Actualiza la configuración SSH de VS Code para utilizar el mismo puerto.
 
-### VS Code disconnects immediately
+### VS Code se desconecta inmediatamente
 
-Make sure the `cloudflared access tcp` terminal is still running.
+Asegúrate de que el terminal que ejecuta `cloudflared access tcp` sigue abierto.
 
-Also test the connection outside VS Code:
+Prueba también la conexión fuera de VS Code:
 
 ```bash
 ssh \
@@ -1220,47 +1199,47 @@ ssh \
   root@127.0.0.1
 ```
 
-Resolve command-line SSH problems before retrying VS Code.
+Resuelve los problemas de SSH en la línea de comandos antes de volver a intentarlo con VS Code.
 
-### SSH reports that the host key changed
+### SSH indica que la clave de host ha cambiado
 
-A host-key change may be legitimate if Ubuntu was reinstalled or `ssh-keygen -A` generated replacement keys. It can also indicate that the connection is reaching a different server.
+Un cambio en la clave de host puede ser legítimo si se ha reinstalado Ubuntu o se han regenerado sus claves de host de forma deliberada. También puede indicar que la conexión está llegando a un servidor diferente.
 
-Verify the reason before removing the stored key.
+Comprueba el motivo antes de eliminar la clave almacenada.
 
-After intentionally rebuilding the Ubuntu environment, remove the old alias only after confirming the change:
+Si has reconstruido deliberadamente el entorno de Ubuntu, elimina la entrada antigua de la clave de host correspondiente al alias solo después de confirmar el cambio:
 
 ```bash
 ssh-keygen -R ssh.example.com
 ```
 
-Reconnect and review the new fingerprint.
+Vuelve a conectarte y revisa la nueva huella digital.
 
-### Termux stops when the screen is off
+### Termux se detiene cuando la pantalla está apagada
 
-Run:
+Ejecuta:
 
 ```bash
 termux-wake-lock
 ```
 
-Confirm that Android battery usage for Termux is set to **Unrestricted**.
+Confirma que el ajuste de uso de la batería de Termux en Android está establecido en **Sin restricciones**.
 
-Also check manufacturer-specific settings such as sleeping applications, background-usage limits, and automatic memory cleanup.
+Comprueba también los ajustes específicos del fabricante, como las aplicaciones en suspensión, los límites de uso en segundo plano y la limpieza automática de memoria.
 
-## 25. Limitations
+## 25. Limitaciones
 
-Ubuntu is running inside a PRoot environment rather than as a conventional virtual machine or native Android service. The seatup therefore depends on Termux remaining alive.
+Ubuntu se ejecuta dentro de un entorno PRoot en lugar de hacerlo como una máquina virtual convencional o un servicio nativo de Android. Por lo tanto, la configuración depende de que Termux permanezca activo.
 
-The tunnel's public TCP mode streams TCP over a WebSocket connection. Cloudflare recommends its Client-to-Tunnel architecture instead for connections that must remain active for long periods.
+El modo TCP público del túnel transporta el tráfico TCP mediante una conexión WebSocket. Para las conexiones que deban permanecer activas durante periodos prolongados, Cloudflare recomienda utilizar en su lugar su arquitectura Client-to-Tunnel.
 
-For this reason:
+Ten en cuenta las siguientes limitaciones:
 
-* Occasional SSH administration should work well.
-* VS Code Remote SSH can work, but long sessions may disconnect.
-* Suspending the client computer may terminate the relay.
-* Changing phone networks may interrupt the tunnel.
-* Updating or restarting `cloudflared` terminates current connections.
-* Rebooting the phone stops the server until Termux or Termux:Boot starts it again.
+- La administración ocasional mediante SSH debería funcionar bien.
+- VS Code Remote - SSH puede funcionar, pero las sesiones largas podrían desconectarse.
+- Suspender el ordenador cliente puede detener el relé.
+- Cambiar de red en el teléfono puede interrumpir el túnel.
+- Actualizar o reiniciar `cloudflared` finaliza las conexiones actuales.
+- Reiniciar el teléfono detiene el servidor hasta que Termux o Termux:Boot lo vuelvan a iniciar.
 
-For a permanently available server, use conventional Linux hardware, a virtual private server, or a private-network Cloudflare Client-to-Tunnel configuration.
+Para disponer de un servidor permanentemente disponible, utiliza un equipo Linux convencional, un servidor privado virtual o una configuración Client-to-Tunnel de Cloudflare sobre una red privada.
