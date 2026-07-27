@@ -1,5 +1,8 @@
 ---
 title: "Convierte un teléfono Android en un servidor Ubuntu remoto (sin acceso root en Android)"
+description: "Guía probada para ejecutar Ubuntu en Android con Termux y PRoot y proteger el acceso SSH remoto mediante Cloudflare Access."
+author: Nicolás Calvache
+lang: es
 date: 2026-07-25
 tags: [android, termux, ubuntu, ssh, vscode, cloudflare]
 category: [tecnología]
@@ -121,7 +124,7 @@ Instala una imagen de Ubuntu 26.04 con la versión fijada:
 proot-distro install ubuntu:26.04
 ```
 
-Fijar la versión de la imagen evita que el comando instale de forma inesperada una versión más reciente de Ubuntu o una versión en desarrollo. La documentación actual de `proot-distro` utiliza `ubuntu:26.04` como ejemplo para Ubuntu.
+Fijar la versión de la imagen evita que el comando instale de forma inesperada una versión más reciente de Ubuntu o una versión en desarrollo. La [referencia de comandos de PRoot-Distro](https://github.com/termux/proot-distro#commands-reference) documenta la sintaxis de imágenes OCI con etiqueta; comprueba que la versión de Ubuntu elegida siga disponible para la arquitectura del teléfono antes de instalarla.
 
 Entra en Ubuntu:
 
@@ -1243,3 +1246,14 @@ Ten en cuenta las siguientes limitaciones:
 - Reiniciar el teléfono detiene el servidor hasta que Termux o Termux:Boot lo vuelvan a iniciar.
 
 Para disponer de un servidor permanentemente disponible, utiliza un equipo Linux convencional, un servidor privado virtual o una configuración Client-to-Tunnel de Cloudflare sobre una red privada.
+
+## 26. Fuentes oficiales
+
+Las interfaces y los comandos pueden cambiar después de publicar esta guía. Utiliza estas fuentes
+primarias para comprobar su funcionamiento actual:
+
+- [Guía de instalación de Termux](https://github.com/termux/termux-app#installation)
+- [Referencia de comandos de PRoot-Distro](https://github.com/termux/proot-distro#commands-reference)
+- [Cloudflare Access para TCP arbitrario](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/cloudflared-authentication/arbitrary-tcp/)
+- [Políticas de Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/)
+- [Manual de configuración del servidor OpenSSH](https://man.openbsd.org/sshd_config)

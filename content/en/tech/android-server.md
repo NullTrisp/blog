@@ -1,6 +1,9 @@
 ---
 
 title: "Turn an Android Phone into a Remote Ubuntu Server (No Android Root Access Required)"
+description: "A tested guide to running Ubuntu on Android with Termux and PRoot, then securing remote SSH access through Cloudflare Access."
+author: Nicolás Calvache
+lang: en
 date: 2026-07-25
 tags: [android, termux, ubuntu, ssh, vscode, cloudflare]
 category: [technology]
@@ -123,7 +126,7 @@ Install a pinned Ubuntu 26.04 image:
 proot-distro install ubuntu:26.04
 ```
 
-Pinning the image version prevents the command from unexpectedly installing a newer Ubuntu release or a development release. The current `proot-distro` documentation uses `ubuntu:26.04` as its Ubuntu example.
+Pinning the image version prevents the command from unexpectedly installing a newer Ubuntu release or a development release. The [PRoot-Distro command reference](https://github.com/termux/proot-distro#commands-reference) documents the tagged OCI image syntax; verify that the selected Ubuntu tag is still available for your phone's architecture before installing it.
 
 Enter Ubuntu:
 
@@ -1223,3 +1226,14 @@ Keep the following limitations in mind:
 * Rebooting the phone stops the server until Termux or Termux:Boot starts it again.
 
 For a permanently available server, use conventional Linux hardware, a virtual private server, or a Cloudflare Client-to-Tunnel configuration over a private network.
+
+## 26. Official references
+
+Interfaces and commands can change after this guide is published. Use these primary sources to
+check the current behavior:
+
+* [Termux installation guidance](https://github.com/termux/termux-app#installation)
+* [PRoot-Distro command reference](https://github.com/termux/proot-distro#commands-reference)
+* [Cloudflare Access for arbitrary TCP](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/cloudflared-authentication/arbitrary-tcp/)
+* [Cloudflare Access policies](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/)
+* [OpenSSH server configuration manual](https://man.openbsd.org/sshd_config)

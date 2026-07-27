@@ -14,7 +14,13 @@ import { write } from "../quartz/plugins/emitters/helpers"
 import { FullSlug, getAllSegmentPrefixes, joinSegments, pathToRoot } from "../quartz/util/path"
 import { defaultListPageLayout, sharedPageComponents } from "../quartz.layout"
 import { LocalizedTagContent, localizedConfiguration } from "./tagLocalization"
-import { languageFromLocale, languageFromSlug, TAG_LANGUAGES, TagLanguage } from "./tagPaths"
+import {
+  getTagRedirectLanguage,
+  languageFromLocale,
+  languageFromSlug,
+  TAG_LANGUAGES,
+  TagLanguage,
+} from "./tagPaths"
 
 interface LocalizedTagPageOptions extends FullPageLayout {
   sort?: (f1: QuartzPluginData, f2: QuartzPluginData) => number
@@ -64,7 +70,7 @@ function escapeHtml(value: string): string {
 
 function redirectPage(target: string): string {
   const safeTarget = escapeHtml(target)
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${safeTarget}"><link rel="canonical" href="${safeTarget}"><title>Redirecting…</title></head><body><a href="${safeTarget}">Continue</a></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,follow"><meta http-equiv="refresh" content="0; url=${safeTarget}"><link rel="canonical" href="${safeTarget}"><title>Redirecting…</title></head><body><a href="${safeTarget}">Continue</a></body></html>`
 }
 
 export const LocalizedTagPage: QuartzEmitterPlugin<Partial<LocalizedTagPageOptions>> = (
@@ -125,8 +131,8 @@ export const LocalizedTagPage: QuartzEmitterPlugin<Partial<LocalizedTagPageOptio
       const allTags = new Set(tagPages.map((page) => page.tag))
       for (const tag of allTags) {
         const slug = joinSegments("tags", tag) as FullSlug
-        const target =
-          tag === "index" ? `/${defaultLanguage}/tags/` : `/${defaultLanguage}/tags/${tag}`
+        const language = getTagRedirectLanguage(tagPages, tag, defaultLanguage)
+        const target = tag === "index" ? `/${language}/tags/` : `/${language}/tags/${tag}`
         yield write({ ctx, content: redirectPage(target), slug, ext: ".html" })
       }
     },

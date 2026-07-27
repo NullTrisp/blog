@@ -3,6 +3,18 @@ import { FullSlug, joinSegments, simplifySlug } from "../quartz/util/path"
 export const TAG_LANGUAGES = ["en", "es"] as const
 export type TagLanguage = (typeof TAG_LANGUAGES)[number]
 
+export function getTagRedirectLanguage(
+  pages: ReadonlyArray<{ language: TagLanguage; tag: string }>,
+  tag: string,
+  defaultLanguage: TagLanguage,
+): TagLanguage {
+  if (pages.some((page) => page.tag === tag && page.language === defaultLanguage)) {
+    return defaultLanguage
+  }
+
+  return pages.find((page) => page.tag === tag)?.language ?? defaultLanguage
+}
+
 export function languageFromSlug(slug?: string): TagLanguage | undefined {
   const language = slug?.split("/").find(Boolean)
   return TAG_LANGUAGES.find((candidate) => candidate === language)

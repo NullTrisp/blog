@@ -1,5 +1,9 @@
 ---
 title: "My Top 5 Favorite Movies"
+description: "Five favorite science-fiction and animated films, with brief notes on what makes each memorable."
+translation_id: favorite-movies
+lang: en
+author: Nicolás Calvache
 date: 2026-06-21
 tags: [movies, favorites, cinema]
 category: [media, film]

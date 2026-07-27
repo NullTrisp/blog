@@ -1,5 +1,8 @@
 ---
 title: "Reseña de Libro: 'Guía del Autoestopista Galáctico'"
+description: "Una reseña breve de ejemplo de la comedia de ciencia ficción de Douglas Adams."
+lang: es
+draft: true
 date: 2026-06-21
 tags:
   - libros

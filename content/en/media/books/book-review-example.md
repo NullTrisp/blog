@@ -1,5 +1,8 @@
 ---
 title: "Book Review: 'The Hitchhiker's Guide to the Galaxy'"
+description: "A short example review of Douglas Adams's science-fiction comedy The Hitchhiker's Guide to the Galaxy."
+lang: en
+draft: true
 date: 2026-06-21
 tags:
   - books

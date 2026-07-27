@@ -4,10 +4,16 @@ import { withPageLocale } from "./custom/localization"
 import { LocalizedTagList } from "./custom/tagLocalization"
 import LocalizedGraph from "./custom/localizedGraph"
 import LocalizedBreadcrumbs from "./custom/localizedBreadcrumbs"
+import SeoHead from "./custom/SeoHead"
+import AuthorByline from "./custom/AuthorByline"
 
 // components shared across all pages
 export const sharedPageComponents: SharedLayout = {
-  head: withPageLocale(Component.Head()),
+  head: withPageLocale(
+    SeoHead({
+      authorName: "Nicolás Calvache",
+    }),
+  ),
   header: [Component.LanguageSwitcher()],
   afterBody: [],
   footer: withPageLocale(
@@ -25,6 +31,7 @@ export const defaultContentPageLayout: PageLayout = {
       condition: (page) => page.fileData.slug !== "index",
     }),
     Component.ArticleTitle(),
+    AuthorByline(),
     withPageLocale(Component.ContentMeta()),
     LocalizedTagList,
   ],
